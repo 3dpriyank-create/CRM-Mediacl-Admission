@@ -2,22 +2,36 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() { return request.auth != null; }
-    function role() { return signedIn() ? get(/databases/$(database)/documents/Users/$(request.auth.uid)).data.role : null; }
-    function admin() { return role() == 'superAdmin'; }
-    function staff() { return role() in ['superAdmin','counselor','salesExecutive']; }
-    function owner(uid) { return signedIn() && request.auth.uid == uid; }
+    function role() { return signedIn() && exists(/databases/$(database)/documents/Users/$(request.auth.uid)) ? get(/databases/$(database)/documents/Users/$(request.auth.uid)).data.role : request.auth.token.role; }
+    function superAdmin() { return role() == 'Super Admin'; }
+    function admin() { return role() in ['Super Admin','Admin']; }
+    function staff() { return role() in ['Super Admin','Admin','Counselor','Sales Executive','Accounts']; }
+    function counselor() { return role() in ['Super Admin','Admin','Counselor']; }
+    function accounts() { return role() in ['Super Admin','Admin','Accounts']; }
+    function owner(userId) { return signedIn() && request.auth.uid == userId; }
 
     match /Users/{userId} { allow read: if owner(userId) || admin(); allow create, update, delete: if admin(); }
-    match /Students/{studentId} { allow read: if staff() || owner(resource.data.userId) || owner(resource.data.parentUserId); allow write: if staff(); }
-    match /Leads/{leadId} { allow read, create, update: if staff(); allow delete: if admin(); }
-    match /Counselors/{id} { allow read: if signedIn(); allow write: if admin(); }
-    match /Colleges/{id} { allow read: if signedIn(); allow write: if staff(); }
-    match /CounselingSessions/{id} { allow read: if staff() || owner(resource.data.studentUserId) || owner(resource.data.parentUserId); allow write: if staff(); }
-    match /Documents/{id} { allow read: if staff() || owner(resource.data.studentUserId) || owner(resource.data.parentUserId); allow create: if signedIn(); allow update, delete: if staff() || owner(resource.data.studentUserId); }
-    match /Payments/{id} { allow read: if staff() || owner(resource.data.studentUserId) || owner(resource.data.parentUserId); allow write: if staff(); }
+    match /Students/{id} { allow read: if staff() || owner(resource.data.userId) || owner(resource.data.parentUserId); allow write: if staff(); }
+    match /Parents/{id} { allow read: if staff() || owner(resource.data.userId); allow write: if staff(); }
+    match /Leads/{id} { allow read, create, update: if staff(); allow delete: if admin(); }
+    match /LeadActivities/{id} { allow read: if staff(); allow create: if staff(); allow update, delete: if false; }
     match /Tasks/{id} { allow read, write: if staff(); }
+    match /FollowUps/{id} { allow read, write: if staff(); }
+    match /Payments/{id} { allow read: if staff() || owner(resource.data.studentUserId) || owner(resource.data.parentUserId); allow write: if accounts() || counselor(); }
+    match /Invoices/{id} { allow read: if staff() || owner(resource.data.studentUserId) || owner(resource.data.parentUserId); allow write: if accounts(); }
+    match /Documents/{id} { allow read: if staff() || owner(resource.data.studentUserId) || owner(resource.data.parentUserId); allow create: if signedIn(); allow update, delete: if staff(); }
+    match /Colleges/{id} { allow read: if signedIn(); allow write: if counselor(); }
+    match /Courses/{id} { allow read: if signedIn(); allow write: if counselor(); }
+    match /Cutoffs/{id} { allow read: if signedIn(); allow write: if counselor(); }
+    match /CounsellingRounds/{id} { allow read: if signedIn(); allow write: if counselor(); }
+    match /SeatMatrix/{id} { allow read: if signedIn(); allow write: if counselor(); }
     match /Notifications/{id} { allow read: if staff() || owner(resource.data.userId); allow write: if staff(); }
     match /Reports/{id} { allow read, write: if admin(); }
-    match /ActivityLogs/{id} { allow read: if admin(); allow create: if signedIn(); allow update, delete: if false; }
+    match /Settings/{id} { allow read: if staff(); allow write: if admin(); }
+    match /Templates/{id} { allow read: if staff(); allow write: if admin(); }
+    match /WhatsAppLogs/{id} { allow read: if admin(); allow create: if staff(); allow update, delete: if false; }
+    match /EmailLogs/{id} { allow read: if admin(); allow create: if staff(); allow update, delete: if false; }
+    match /Sessions/{id} { allow read: if owner(resource.data.uid) || admin(); allow write: if signedIn(); }
+    match /AuditLogs/{id} { allow read: if admin(); allow create: if signedIn(); allow update, delete: if false; }
   }
 }

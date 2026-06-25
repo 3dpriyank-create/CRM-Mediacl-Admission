@@ -1,0 +1,8 @@
+import { z } from 'zod';
+export const taskSchema=z.object({title:z.string().min(2),description:z.string().optional(),assignedTo:z.string(),leadId:z.string().optional(),studentId:z.string().optional(),dueAt:z.string(),priority:z.enum(['Low','Medium','High','Urgent']).default('Medium'),recurring:z.object({frequency:z.enum(['daily','weekly','monthly']),until:z.string().optional()}).optional(),calendarEventId:z.string().optional(),status:z.enum(['Open','Completed','Cancelled']).default('Open')});
+export const followUpSchema=z.object({leadId:z.string(),studentId:z.string().optional(),channel:z.enum(['Call','WhatsApp','Email','SMS']),dueAt:z.string(),reason:z.string(),status:z.enum(['Pending','Done','Missed']).default('Pending')});
+export const paymentSchema=z.object({studentId:z.string(),provider:z.enum(['razorpay','stripe']),amount:z.number().positive(),currency:z.string().default('INR'),gstRate:z.number().default(18),packageName:z.string(),metadata:z.record(z.unknown()).optional()});
+export const documentSchema=z.object({studentId:z.string(),documentType:z.string(),fileName:z.string(),contentType:z.string(),verificationStatus:z.enum(['Pending','Verified','Rejected']).default('Pending')});
+export const emailSchema=z.object({to:z.string().email(),template:z.string(),data:z.record(z.unknown()).default({})});
+export const whatsappSchema=z.object({to:z.string().min(7),type:z.enum(['text','image','document','template']),text:z.string().optional(),mediaUrl:z.string().url().optional(),templateName:z.string().optional(),language:z.string().default('en')});
+export const notificationSchema=z.object({userId:z.string(),title:z.string(),body:z.string(),token:z.string().optional(),channels:z.array(z.enum(['push','email','whatsapp'])).default(['push'])});

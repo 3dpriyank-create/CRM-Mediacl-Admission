@@ -33,3 +33,20 @@ Production-ready responsive CRM for a medical admission counseling company manag
 
 ## Collections
 See `docs/FIRESTORE_SCHEMA.md` for the complete schema and `firestore.rules` for RBAC security rules.
+
+## Backend API
+The production backend lives in `backend/` and is deployed as Firebase Cloud Functions Gen2. It exposes `/api/v1` for the React frontend and `/docs` for Swagger UI.
+
+### Backend commands
+```bash
+cd backend
+cp .env.example .env
+npm install
+npm run build
+npm run serve
+```
+
+### Backend deployment
+```bash
+firebase deploy --only functions,firestore:rules,firestore:indexes,storage
+```

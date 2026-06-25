@@ -1,0 +1,14 @@
+import { db } from '../firebase/admin';
+import { Collections } from '../models/collections';
+import type { College } from '../models/domain';
+import { collegeRepository } from '../repositories/college.repository';
+import type { Request } from 'express';
+import { auditService } from './audit.service';
+export class CollegeService{
+ create(req:Request,data:Omit<College,'id'>){return collegeRepository.create(data).then(r=>{void auditService.log(req,'CREATE','Colleges',r.id);return r;});}
+ async search(q:Record<string,unknown>,limit=25){let ref=db.collection(Collections.Colleges).limit(limit) as FirebaseFirestore.Query;if(q.state)ref=ref.where('state','==',q.state);if(q.type)ref=ref.where('collegeType','==',q.type);const docs=(await ref.get()).docs.map(d=>d.data() as College);return docs.filter(c=>!q.course||c.courses.includes(String(q.course))).filter(c=>!q.budget||c.fees.some(f=>f.management<=Number(q.budget)||f.government<=Number(q.budget)));}
+ get(id:string){return collegeRepository.get(id)}
+ update(req:Request,id:string,data:Partial<College>){return collegeRepository.update(id,data).then(r=>{void auditService.log(req,'UPDATE','Colleges',id,data);return r;});}
+ delete(req:Request,id:string){void auditService.log(req,'DELETE','Colleges',id);return collegeRepository.delete(id);}
+ async predict(input:{neetScore:number;air:number;stateRank?:number;category:string;state:string;gender?:string;pwd:boolean;budget:number;preferredStates:string[];preferredCourses:string[]}){const colleges=await this.search({},500);const ranked=colleges.map(c=>{const courseFit=input.preferredCourses.length?c.courses.some(x=>input.preferredCourses.includes(x)):true;const stateFit=input.preferredStates.includes(c.state)||c.state===input.state;const bestCutoff=c.cutoffs.filter(co=>(!input.preferredCourses.length||input.preferredCourses.includes(co.course))&&(co.category===input.category||co.category==='UR')).sort((a,b)=>b.rank-a.rank)[0];const rankDelta=bestCutoff?bestCutoff.rank-input.air:0;const rankScore=bestCutoff?Math.max(0,Math.min(70,35+(rankDelta/(bestCutoff.rank||1))*70)):20;const fee=c.fees.find(f=>!input.preferredCourses.length||input.preferredCourses.includes(f.course));const feeScore=fee?(input.budget>=Math.min(fee.government,fee.management)?15:Math.max(0,15*input.budget/Math.min(fee.government||Infinity,fee.management||Infinity))):5;const seatScore=Math.min(10,c.seatMatrix.reduce((s,m)=>s+m.availableSeats,0)/10);const preference=(courseFit?3:0)+(stateFit?2:0)+(input.pwd?1:0);const probability=Math.round(Math.min(98,rankScore+feeScore+seatScore+preference));return{college:c,probability,band:probability>=75?'safe':probability>=45?'moderate':'dream'};}).sort((a,b)=>b.probability-a.probability);return{safeColleges:ranked.filter(r=>r.band==='safe'),moderateColleges:ranked.filter(r=>r.band==='moderate'),dreamColleges:ranked.filter(r=>r.band==='dream')};}}
+export const collegeService=new CollegeService();

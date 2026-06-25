@@ -1,0 +1,11 @@
+import { z } from 'zod';
+import { category } from './common.validators';
+export const leadStatus=z.enum(['New','Contacted','Interested','Counseling Scheduled','Document Received','College Discussion','Payment Pending','Admission Confirmed','Lost']);
+export const priority=z.enum(['Low','Medium','High','Urgent']);
+export const createLeadSchema=z.object({studentName:z.string().min(2),mobile:z.string().min(7),whatsapp:z.string().optional(),email:z.string().email().optional(),city:z.string().optional(),state:z.string().min(2),category,neetScore:z.number().min(0).max(720).optional(),airRank:z.number().int().positive().optional(),stateRank:z.number().int().positive().optional(),interestedCourse:z.string().min(2),leadSource:z.string().min(2),leadStatus:leadStatus.default('New'),leadPriority:priority.default('Medium'),assignedTo:z.string().optional(),tags:z.array(z.string()).default([]),notes:z.array(z.string()).default([]),budget:z.number().nonnegative().optional()});
+export const updateLeadSchema=createLeadSchema.partial();
+export const assignLeadSchema=z.object({assignedTo:z.string().min(1)});
+export const noteSchema=z.object({note:z.string().min(1)});
+export const tagSchema=z.object({tags:z.array(z.string()).min(1)});
+export const mergeSchema=z.object({sourceLeadId:z.string().min(1),targetLeadId:z.string().min(1)});
+export const bulkImportSchema=z.object({leads:z.array(createLeadSchema).min(1).max(1000)});

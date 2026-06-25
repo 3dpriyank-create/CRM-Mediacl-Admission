@@ -1,0 +1,6 @@
+import dotenv from 'dotenv';
+import { z } from 'zod';
+dotenv.config();
+const schema=z.object({NODE_ENV:z.string().default('development'),API_BASE_URL:z.string().url().optional(),CORS_ORIGINS:z.string().default('*'),JWT_SECRET:z.string().min(16).default('dev-jwt-secret-change-in-production'),JWT_REFRESH_SECRET:z.string().min(16).default('dev-refresh-secret-change-in-production'),JWT_EXPIRES_IN:z.string().default('15m'),JWT_REFRESH_EXPIRES_IN:z.string().default('30d'),FIREBASE_STORAGE_BUCKET:z.string().optional(),SMTP_HOST:z.string().optional(),SMTP_PORT:z.coerce.number().default(587),SMTP_SECURE:z.coerce.boolean().default(false),SMTP_USER:z.string().optional(),SMTP_PASS:z.string().optional(),SMTP_FROM:z.string().default('Doctor Admission <no-reply@doctoradmission.local>'),WHATSAPP_TOKEN:z.string().optional(),WHATSAPP_PHONE_NUMBER_ID:z.string().optional(),WHATSAPP_VERIFY_TOKEN:z.string().default('doctor-admission-webhook'),RAZORPAY_KEY_ID:z.string().optional(),RAZORPAY_KEY_SECRET:z.string().optional(),STRIPE_SECRET_KEY:z.string().optional(),STRIPE_WEBHOOK_SECRET:z.string().optional(),ENCRYPTION_KEY:z.string().optional()});
+export const env=schema.parse(process.env);
+export const corsOrigins=env.CORS_ORIGINS==='*'?'*':env.CORS_ORIGINS.split(',').map(v=>v.trim());

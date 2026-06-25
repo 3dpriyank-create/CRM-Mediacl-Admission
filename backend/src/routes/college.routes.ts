@@ -1,0 +1,14 @@
+import { Router } from 'express';
+import { collegeController } from '../controllers/college.controller';
+import { authenticate, requireRoles } from '../auth/auth.middleware';
+import { validate } from '../middleware/validate';
+import { collegeSchema, predictionSchema } from '../validators/college.validators';
+import { idParam } from '../validators/common.validators';
+export const collegeRouter=Router();
+collegeRouter.use(authenticate);
+collegeRouter.get('/',collegeController.search);
+collegeRouter.post('/predict',validate({body:predictionSchema}),collegeController.predict);
+collegeRouter.post('/',requireRoles('Super Admin','Admin','Counselor'),validate({body:collegeSchema}),collegeController.create);
+collegeRouter.get('/:id',validate({params:idParam}),collegeController.get);
+collegeRouter.put('/:id',requireRoles('Super Admin','Admin','Counselor'),validate({params:idParam,body:collegeSchema.partial()}),collegeController.update);
+collegeRouter.delete('/:id',requireRoles('Super Admin','Admin'),validate({params:idParam}),collegeController.remove);

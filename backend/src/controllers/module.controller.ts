@@ -1,0 +1,21 @@
+import multer from 'multer';
+import { BaseRepository } from '../repositories/base.repository';
+import { Collections } from '../models/collections';
+import { CrudService } from '../services/crud.service';
+import { asyncHandler } from '../utils/asyncHandler';
+import { getPagination } from '../helpers/pagination';
+import { storageService } from '../storage/storage.service';
+import { paymentService } from '../payment/payment.service';
+import { emailService } from '../email/email.service';
+import { whatsappService } from '../whatsapp/whatsapp.service';
+import { notificationService } from '../notifications/notification.service';
+import { reportService } from '../reports/report.service';
+export const upload=multer({storage:multer.memoryStorage(),limits:{fileSize:10*1024*1024,files:1}});
+export function crudController(collection:string){const service=new CrudService<Record<string,unknown>>(collection,new BaseRepository<Record<string,unknown>>(collection));return{create:asyncHandler(async(req,res)=>res.status(201).json(await service.create(req,req.body))),list:asyncHandler(async(req,res)=>{const p=getPagination(req);res.json(await service.list(p.limit,p.offset));}),get:asyncHandler(async(req,res)=>res.json(await service.get(req.params.id))),update:asyncHandler(async(req,res)=>res.json(await service.update(req,req.params.id,req.body))),remove:asyncHandler(async(req,res)=>{await service.delete(req,req.params.id);res.status(204).send();})};}
+export const studentController=crudController(Collections.Students);export const parentController=crudController(Collections.Parents);export const taskController=crudController(Collections.Tasks);export const followUpController=crudController(Collections.FollowUps);export const courseController=crudController(Collections.Courses);export const cutoffController=crudController(Collections.Cutoffs);export const roundController=crudController(Collections.CounsellingRounds);export const seatMatrixController=crudController(Collections.SeatMatrix);export const settingsController=crudController(Collections.Settings);export const templateController=crudController(Collections.Templates);
+export const documentController={upload:asyncHandler(async(req,res)=>{if(!req.file)throw new Error('File is required');res.status(201).json(await storageService.upload(req.body.studentId,req.body.documentType,req.file,req.auth?.uid));}),signedUrl:asyncHandler(async(req,res)=>res.json({url:await storageService.signedUrl(String(req.query.path))})),verify:asyncHandler(async(req,res)=>res.json(await storageService.verify(req.params.id,req.body.status,req.body.remarks)))};
+export const paymentController={create:asyncHandler(async(req,res)=>res.status(201).json(await paymentService.createOrder(req.body))),status:asyncHandler(async(req,res)=>res.json(await paymentService.markStatus(req.params.id,req.body.status,req.body.metadata))),refund:asyncHandler(async(req,res)=>res.json(await paymentService.refund(req.params.id,req.body.amount,req.body.reason))),invoice:asyncHandler(async(req,res)=>res.json(await paymentService.invoice(req.params.id)))};
+export const emailController={send:asyncHandler(async(req,res)=>res.json(await emailService.send(req.body.to,req.body.template,req.body.data)))};
+export const whatsappController={send:asyncHandler(async(req,res)=>res.json(await whatsappService.send(req.body))),webhookVerify:asyncHandler(async(req,res)=>{const challenge=whatsappService.verify(String(req.query['hub.mode']),String(req.query['hub.verify_token']),String(req.query['hub.challenge']));if(!challenge)return res.sendStatus(403);return res.send(challenge);}),webhook:asyncHandler(async(req,res)=>{res.json({received:true});})};
+export const notificationController={send:asyncHandler(async(req,res)=>res.json(await notificationService.send(req.body)))};
+export const reportController={generate:asyncHandler(async(req,res)=>res.json(await reportService.generate(req.params.type,req.body||{})))};
