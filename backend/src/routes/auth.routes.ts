@@ -1,0 +1,12 @@
+import { Router } from 'express';
+import { authController } from '../controllers/auth.controller';
+import { validate } from '../middleware/validate';
+import { createUserSchema, firebaseLoginSchema, refreshSchema, resetSchema } from '../validators/auth.validators';
+import { authenticate, requireRoles } from '../auth/auth.middleware';
+export const authRouter=Router();
+authRouter.post('/login',validate({body:firebaseLoginSchema}),authController.login);
+authRouter.post('/google',validate({body:firebaseLoginSchema}),authController.googleLogin);
+authRouter.post('/refresh',validate({body:refreshSchema}),authController.refresh);
+authRouter.post('/logout',authenticate,authController.logout);
+authRouter.post('/password-reset',validate({body:resetSchema}),authController.resetPassword);
+authRouter.post('/users',authenticate,requireRoles('Super Admin','Admin'),validate({body:createUserSchema}),authController.createUser);

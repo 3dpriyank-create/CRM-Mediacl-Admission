@@ -1,0 +1,11 @@
+import Razorpay from 'razorpay';
+import Stripe from 'stripe';
+import { env } from '../config/env';
+import { db, FieldValue } from '../firebase/admin';
+import { Collections } from '../models/collections';
+export class PaymentService{private razorpay=env.RAZORPAY_KEY_ID&&env.RAZORPAY_KEY_SECRET?new Razorpay({key_id:env.RAZORPAY_KEY_ID,key_secret:env.RAZORPAY_KEY_SECRET}):null;private stripe=env.STRIPE_SECRET_KEY?new Stripe(env.STRIPE_SECRET_KEY):null;
+ async createOrder(input:{studentId:string;provider:'razorpay'|'stripe';amount:number;currency:string;gstRate:number;packageName:string;metadata?:Record<string,unknown>}){const gst=Math.round(input.amount*input.gstRate/100);const total=input.amount+gst;let providerPayload:unknown;if(input.provider==='razorpay'){if(!this.razorpay)throw new Error('Razorpay is not configured');providerPayload=await this.razorpay.orders.create({amount:total*100,currency:input.currency,notes:{studentId:input.studentId,packageName:input.packageName}});}else{if(!this.stripe)throw new Error('Stripe is not configured');providerPayload=await this.stripe.paymentIntents.create({amount:total*100,currency:input.currency.toLowerCase(),metadata:{studentId:input.studentId,packageName:input.packageName}});}const ref=await db.collection(Collections.Payments).add({...input,gst,total,status:'Created',providerPayload,createdAt:FieldValue.serverTimestamp()});return{id:ref.id,total,gst,providerPayload};}
+ async markStatus(id:string,status:string,metadata?:unknown){await db.collection(Collections.Payments).doc(id).set({status,metadata,updatedAt:FieldValue.serverTimestamp()},{merge:true});return{id,status};}
+ async refund(id:string,amount:number,reason:string){const ref=db.collection(Collections.Payments).doc(id);await ref.set({refund:{amount,reason,status:'Requested',createdAt:FieldValue.serverTimestamp()},status:'Refund Requested'},{merge:true});return{id,amount,reason};}
+ async invoice(paymentId:string){const payment=(await db.collection(Collections.Payments).doc(paymentId).get()).data();const invoiceRef=await db.collection(Collections.Invoices).add({paymentId,payment,invoiceNumber:`DA-${Date.now()}`,createdAt:FieldValue.serverTimestamp()});return{id:invoiceRef.id,...(await invoiceRef.get()).data()};}}
+export const paymentService=new PaymentService();

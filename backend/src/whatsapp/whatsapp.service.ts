@@ -1,0 +1,8 @@
+import { env } from '../config/env';
+import { db, FieldValue } from '../firebase/admin';
+import { Collections } from '../models/collections';
+export class WhatsAppService{private endpoint(){return `https://graph.facebook.com/v20.0/${env.WHATSAPP_PHONE_NUMBER_ID}/messages`;}
+ async send(input:{to:string;type:'text'|'image'|'document'|'template';text?:string;mediaUrl?:string;templateName?:string;language?:string}){if(!env.WHATSAPP_TOKEN||!env.WHATSAPP_PHONE_NUMBER_ID)throw new Error('WhatsApp Cloud API is not configured');const body=this.payload(input);const res=await fetch(this.endpoint(),{method:'POST',headers:{Authorization:`Bearer ${env.WHATSAPP_TOKEN}`,'Content-Type':'application/json'},body:JSON.stringify(body)});const json=await res.json();await db.collection(Collections.WhatsAppLogs).add({request:body,response:json,status:res.status,createdAt:FieldValue.serverTimestamp()});if(!res.ok)throw new Error(`WhatsApp API failed: ${JSON.stringify(json)}`);return json;}
+ payload(i:{to:string;type:string;text?:string;mediaUrl?:string;templateName?:string;language?:string}){const base={messaging_product:'whatsapp',to:i.to,type:i.type};if(i.type==='text')return{...base,text:{body:i.text}};if(i.type==='image')return{...base,image:{link:i.mediaUrl,caption:i.text}};if(i.type==='document')return{...base,document:{link:i.mediaUrl,caption:i.text,filename:'document.pdf'}};return{...base,template:{name:i.templateName,language:{code:i.language||'en'}}};}
+ verify(mode?:string,token?:string,challenge?:string){return mode==='subscribe'&&token===env.WHATSAPP_VERIFY_TOKEN?challenge:null;}}
+export const whatsappService=new WhatsAppService();

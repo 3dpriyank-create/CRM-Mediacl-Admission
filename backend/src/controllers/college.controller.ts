@@ -1,0 +1,3 @@
+import { collegeService } from '../services/college.service';
+import { asyncHandler } from '../utils/asyncHandler';
+export const collegeController={create:asyncHandler(async(req,res)=>res.status(201).json(await collegeService.create(req,req.body))),search:asyncHandler(async(req,res)=>res.json(await collegeService.search(req.query,Number(req.query.limit||25)))),get:asyncHandler(async(req,res)=>res.json(await collegeService.get(req.params.id))),update:asyncHandler(async(req,res)=>res.json(await collegeService.update(req,req.params.id,req.body))),remove:asyncHandler(async(req,res)=>{await collegeService.delete(req,req.params.id);res.status(204).send();}),predict:asyncHandler(async(req,res)=>res.json(await collegeService.predict(req.body)))};

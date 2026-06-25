@@ -1,0 +1,8 @@
+import jwt from 'jsonwebtoken';
+import { env } from '../config/env';
+import type { Role } from '../models/domain';
+export interface JwtPayload{uid:string;email?:string;role:Role;sessionId:string;}
+export const signAccessToken=(payload:JwtPayload)=>jwt.sign(payload,env.JWT_SECRET,{expiresIn:env.JWT_EXPIRES_IN});
+export const signRefreshToken=(payload:JwtPayload)=>jwt.sign(payload,env.JWT_REFRESH_SECRET,{expiresIn:env.JWT_REFRESH_EXPIRES_IN});
+export const verifyAccessToken=(token:string)=>jwt.verify(token,env.JWT_SECRET) as JwtPayload;
+export const verifyRefreshToken=(token:string)=>jwt.verify(token,env.JWT_REFRESH_SECRET) as JwtPayload;

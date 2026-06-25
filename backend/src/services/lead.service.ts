@@ -1,0 +1,22 @@
+import { FieldValue, db } from '../firebase/admin';
+import { Collections } from '../models/collections';
+import type { Lead } from '../models/domain';
+import { leadRepository, searchLeads } from '../repositories/lead.repository';
+import { auditService } from './audit.service';
+import type { Request } from 'express';
+export class LeadService{
+ keywords(l:Partial<Lead>){return [l.studentName,l.mobile,l.email,l.state,l.leadStatus,l.leadSource,...(l.tags||[])].filter(Boolean).flatMap(v=>String(v).toLowerCase().split(/\s+/));}
+ async create(req:Request,data:Omit<Lead,'id'>){const lead=await leadRepository.create({...data,searchKeywords:this.keywords(data)} as Omit<Lead,'id'>);await this.activity(lead.id,'Created lead',req.auth?.uid);void auditService.log(req,'CREATE','Leads',lead.id);return lead;}
+ async list(query:Record<string,unknown>,limit:number,offset:number){if(query.q)return searchLeads(String(query.q),limit);let ref=db.collection(Collections.Leads).orderBy('createdAt','desc').offset(offset).limit(limit) as FirebaseFirestore.Query;if(query.status)ref=ref.where('leadStatus','==',query.status);if(query.state)ref=ref.where('state','==',query.state);if(query.assignedTo)ref=ref.where('assignedTo','==',query.assignedTo);const snap=await ref.get();return snap.docs.map(d=>d.data() as Lead);}
+ get(id:string){return leadRepository.get(id)}
+ async update(req:Request,id:string,data:Partial<Lead>){const updated=await leadRepository.update(id,{...data,searchKeywords:this.keywords(data)} as Partial<Lead>);await this.activity(id,'Updated lead',req.auth?.uid,data);void auditService.log(req,'UPDATE','Leads',id,data);return updated;}
+ async delete(req:Request,id:string){await leadRepository.delete(id);void auditService.log(req,'DELETE','Leads',id);}
+ async assign(req:Request,id:string,assignedTo:string){const lead=await leadRepository.update(id,{assignedTo} as Partial<Lead>);await this.activity(id,`Assigned to ${assignedTo}`,req.auth?.uid);return lead;}
+ async addNote(req:Request,id:string,note:string){await db.collection(Collections.Leads).doc(id).update({notes:FieldValue.arrayUnion(note),updatedAt:FieldValue.serverTimestamp()});await this.activity(id,'Added note',req.auth?.uid,{note});return this.get(id);}
+ async addTags(req:Request,id:string,tags:string[]){await db.collection(Collections.Leads).doc(id).update({tags:FieldValue.arrayUnion(...tags),updatedAt:FieldValue.serverTimestamp()});await this.activity(id,'Added tags',req.auth?.uid,{tags});return this.get(id);}
+ async timeline(id:string){const snap=await db.collection(Collections.LeadActivities).where('leadId','==',id).orderBy('createdAt','desc').get();return snap.docs.map(d=>d.data());}
+ async merge(req:Request,sourceLeadId:string,targetLeadId:string){return db.runTransaction(async tx=>{const sRef=db.collection(Collections.Leads).doc(sourceLeadId),tRef=db.collection(Collections.Leads).doc(targetLeadId);const [s,t]=await Promise.all([tx.get(sRef),tx.get(tRef)]);if(!s.exists||!t.exists)throw new Error('Lead not found');const sd=s.data() as Lead,td=t.data() as Lead;tx.set(tRef,{...td,notes:[...(td.notes||[]),...(sd.notes||[])],tags:Array.from(new Set([...(td.tags||[]),...(sd.tags||[])])),updatedAt:FieldValue.serverTimestamp()},{merge:true});tx.delete(sRef);void auditService.log(req,'MERGE','Leads',targetLeadId,{sourceLeadId});return targetLeadId;});}
+ async bulkImport(req:Request,items:Omit<Lead,'id'>[]){const writer=db.bulkWriter();const created:string[]=[];items.forEach(item=>{const ref=db.collection(Collections.Leads).doc();created.push(ref.id);writer.set(ref,{...item,id:ref.id,searchKeywords:this.keywords(item),createdAt:FieldValue.serverTimestamp(),updatedAt:FieldValue.serverTimestamp()});});await writer.close();void auditService.log(req,'BULK_IMPORT','Leads',undefined,{count:items.length});return{created};}
+ async exportCsv(query:Record<string,unknown>){const rows=await this.list(query,1000,0);const headers=['id','studentName','mobile','email','state','category','neetScore','airRank','interestedCourse','leadStatus','assignedTo'];return [headers.join(','),...rows.map(r=>headers.map(h=>JSON.stringify((r as unknown as Record<string,unknown>)[h]??'')).join(','))].join('\n');}
+ private activity(leadId:string,message:string,actorId?:string,metadata?:unknown){return db.collection(Collections.LeadActivities).add({leadId,message,actorId,metadata,createdAt:FieldValue.serverTimestamp()});}}
+export const leadService=new LeadService();
